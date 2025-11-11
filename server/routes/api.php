@@ -14,3 +14,8 @@ use Illuminate\Support\Facades\Route;
 Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
     return $request->user()->only(['id', 'name', 'email', 'email_verified_at']);
 });
+
+// the 'throttle:api to apply thee rate limiter
+// Route::middleware(['auth:sanctum', 'throttle:api'])->get('/user', function (Request $request) {
+//     return $request->user()->only(['id', 'name', 'email', 'email_verified_at']);
+// });
