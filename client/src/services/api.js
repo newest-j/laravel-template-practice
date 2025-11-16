@@ -65,15 +65,15 @@ export const authuser = {
       await initializeCsrf(); // Get CSRF token first
 
       const { data, status } = await rootApi.post("/register", userData);
-      if (status === 200 || response.status === 201) {
+      if (status === 200 || status === 201) {
         return data.user;
       } else {
         // well this error here is thrown if after the backend response successful and the status is not what is expexted like its 500 instead of 200
-        throw new Error(data.message);
+        throw new Error(data?.message || "Signup failed");
       }
     } catch (error) {
       console.error("signup err", error);
-      throw new Error(error.data?.message || error.message || "Signup failed");
+      throw new Error(error?.response?.data?.message || "Signup failed");
     }
   },
 
@@ -85,11 +85,13 @@ export const authuser = {
       if (status === 200) {
         return data.user;
       } else {
-        throw new Error(data.message);
+        throw new Error(data?.message || "Signup failed");
       }
     } catch (error) {
       console.error("login err", error);
-      throw new Error(error.data?.message || error?.message || "Login failed");
+      throw new Error(
+        error?.response?.data?.message || error?.message || "Login failed"
+      );
     }
   },
 
@@ -97,7 +99,7 @@ export const authuser = {
     try {
       const { data, status } = await rootApi.post("/logout");
       if (status === 200) {
-        return data?.message ?? "Logged out successfully";
+        return data?.message || "Logged out successfully";
       }
     } catch (error) {
       console.error("logout err", error);
