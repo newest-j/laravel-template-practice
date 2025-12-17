@@ -5,13 +5,14 @@
 // unlike the laravel fortify that needs to  be written
 // namespace App\Http\Controllers;
 
-namespace App\Http\Controllers;
+namespace App\Http\Controllers\Signinwith;
 
+use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Laravel\Socialite\Facades\Socialite;
 use App\Models\User;
-use Illuminate\Support\Str; // add this
+use Illuminate\Support\Str; // add thisS
 
 class SocialAuthController extends Controller
 {

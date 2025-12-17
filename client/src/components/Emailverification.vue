@@ -23,8 +23,8 @@
 </template>
 
 <script setup lang="ts">
-import { userAuthStore } from "../stores/UserStore";
-const userAuth = userAuthStore();
+import { useUserAuthStore } from "../stores/UserStore";
+const userAuth = useUserAuthStore();
 </script>
 
 <style scoped>

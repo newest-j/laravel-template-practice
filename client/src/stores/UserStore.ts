@@ -1,396 +1,387 @@
 import { defineStore } from "pinia";
+import { ref, reactive, computed } from "vue";
 import Swal from "sweetalert2";
 import { useToast } from "vue-toastification";
-import type UserSignup from "@/UserData/UserSignup";
+import type UserSignup from "@/Typescript/UserSignup";
+import type CurrentUser from "@/Typescript/CurrentUser";
 import { authuser } from "@/services/api.js";
 import { browserTimeZone, formatTimestamp } from "@/utils/Datetime";
 
-export const userAuthStore = defineStore("authstore", {
-  state: () => ({
+export const useUserAuthStore = defineStore("authstore", () => {
+  // ===== State =====
+  const name = ref("");
+  const email = ref("");
+  const password = ref("");
+  const confirmPassword = ref("");
+  const isLoading = ref(false);
+  const resend = reactive({
+    sending: false,
+    lastSentAt: null as number | null,
+  });
+  const timezone = ref(browserTimeZone());
+
+  const currentUser = ref<null | CurrentUser>(null);
+
+  const error = reactive({
     name: "",
     email: "",
     password: "",
     confirmPassword: "",
-    isLoading: false,
-    resend: {
-      sending: false,
-      lastSentAt: null as number | null,
-    },
-    timezone: browserTimeZone(), // default to browser TZ
+  });
 
-    currentUser: null as null | {
-      id: number;
-      name: string;
-      email: string;
-      email_verified_at: string;
-    },
+  // ===== Getters =====
+  const isPasswordMatching = computed<boolean>(
+    () => password.value === confirmPassword.value
+  );
+  const isAuthenticated = computed<boolean>(() => !!currentUser.value);
+  const isVerified = computed<boolean>(
+    () => !!currentUser.value?.email_verified_at
+  );
+  const needsVerification = computed<boolean>(
+    () => isAuthenticated.value && !isVerified.value
+  );
+  const canResend = computed<boolean>(() => {
+    if (!needsVerification.value) return false;
+    if (!resend.lastSentAt) return true;
+    return Date.now() - resend.lastSentAt > 60000; // 60s throttle
+  });
+  const activeTimezone = computed<string>(
+    () => timezone.value || browserTimeZone()
+  );
 
-    error: {
-      name: "",
-      email: "",
-      password: "",
-      confirmPassword: "",
-    },
-  }),
-  getters: {
-    isPasswordMatching(state): boolean {
-      return state.password === state.confirmPassword;
-    },
-    isAuthenticated(state): boolean {
-      // the !! is to make the value return a Boolean
-      return !!state.currentUser;
-    },
-    isVerified(state): boolean {
-      return !!state.currentUser?.email_verified_at;
-    },
-    needsVerification(): boolean {
-      return this.isAuthenticated && !this.isVerified;
-    },
-    canResend(): boolean {
-      if (!this.needsVerification) return false;
-      if (!this.resend.lastSentAt) return true;
-      return Date.now() - this.resend.lastSentAt > 60000; //60s throttle UI
-    },
-    activeTimezone: (s): string => s.timezone || browserTimeZone(),
-  },
-  actions: {
-    validateName() {
-      const fullNameRegex: RegExp = /^[A-Za-z]{2,}(?: [A-Za-z]{2,})+$/;
-      if (!this.name.trim()) {
-        this.error.name = "Name is required";
-      } else if (!fullNameRegex.test(this.name.trim())) {
-        this.error.name =
-          "Please enter your full name (first and last name, letters only)";
+  // ===== Actions =====
+  const validateName = () => {
+    const fullNameRegex = /^[A-Za-z]{2,}(?: [A-Za-z]{2,})+$/;
+    if (!name.value.trim()) error.name = "Name is required";
+    else if (!fullNameRegex.test(name.value.trim()))
+      error.name =
+        "Please enter your full name (first and last name, letters only)";
+    else error.name = "";
+  };
+
+  const validateEmail = () => {
+    const emailReg =
+      /^((\+?[0-9\s\-().]{7,})|([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}))$/;
+    if (!email.value.trim()) error.email = "Email is required";
+    else if (!emailReg.test(email.value.trim()))
+      error.email = "Please enter a valid email address";
+    else error.email = "";
+  };
+
+  const validatePassword = () => {
+    const passwordReg =
+      /^(?=.*[A-Z])(?=.*[a-z])(?=.*\d)(?=.*[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]).{8,20}$/;
+    if (!password.value.trim()) error.password = "Password is required";
+    else if (!passwordReg.test(password.value.trim()))
+      error.password =
+        "Password min 8 and max 20 character at least one uppercase,lowercase,digit,and special character";
+    else error.password = "";
+  };
+
+  const validateConfirmPassword = () => {
+    if (!confirmPassword.value.trim())
+      error.confirmPassword = "Please confirm your password";
+    else if (!isPasswordMatching.value)
+      error.confirmPassword = "The passwords do not match";
+    else error.confirmPassword = "";
+  };
+
+  const fetchCurrentUser = async () => {
+    try {
+      const data = await authuser.me();
+      currentUser.value = data;
+      return data;
+    } catch {
+      currentUser.value = null;
+      return null;
+    }
+  };
+
+  const resendVerification = async () => {
+    if (!canResend.value) return false;
+    resend.sending = true;
+    try {
+      await authuser.resendVerification();
+      resend.lastSentAt = Date.now();
+    } finally {
+      resend.sending = false;
+    }
+  };
+
+  const setTimezone = (tz: string) => {
+    timezone.value = tz;
+  };
+
+  const formatTs = (iso?: string | null, opts?: Intl.DateTimeFormatOptions) => {
+    return formatTimestamp(iso, activeTimezone.value, opts);
+  };
+
+  const createUser = async (userData: UserSignup, router: any) => {
+    const toast = useToast();
+    isLoading.value = true;
+    try {
+      const postResponse = await authuser.signup(userData);
+      if (postResponse) {
+        currentUser.value = postResponse;
+        toast.success("Account created successfully!");
+
+        // reset form
+        name.value = "";
+        password.value = "";
+        email.value = "";
+        confirmPassword.value = "";
+
+        Object.keys(error).forEach((key) => ((error as any)[key] = ""));
+
+        if (router) router.replace("/dashboard");
+        return postResponse;
+      }
+    } catch (err: any) {
+      console.error("Error creating user:", err);
+      toast.error("Failed to create user. " + (err.message || ""));
+      return false;
+    } finally {
+      isLoading.value = false;
+    }
+  };
+
+  const handleSubmit = async (router: any) => {
+    const toast = useToast();
+    isLoading.value = true;
+    try {
+      validateName();
+      validateEmail();
+      validatePassword();
+      validateConfirmPassword();
+
+      if (
+        !error.name &&
+        !error.email &&
+        !error.password &&
+        !error.confirmPassword
+      ) {
+        const result = await createUser(
+          {
+            name: name.value,
+            email: email.value,
+            password: password.value,
+            password_confirmation: confirmPassword.value,
+          },
+          router
+        );
+        return !!result;
       } else {
-        this.error.name = "";
+        toast.error("Please fix the validation errors");
+        return false;
       }
-    },
+    } catch (err: any) {
+      console.error("Handle submit error:", err);
+      toast.error("Something went wrong" + (err.message || ""));
+      return false;
+    } finally {
+      isLoading.value = false;
+    }
+  };
 
-    validateEmail() {
-      const emailReg: RegExp =
-        /^((\+?[0-9\s\-().]{7,})|([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}))$/;
+  const loginUser = async (userData: UserSignup, router: any) => {
+    const toast = useToast();
+    isLoading.value = true;
+    try {
+      const postResponse = await authuser.login(userData);
+      if (postResponse) {
+        currentUser.value = postResponse;
+        toast.success("Login successful!");
+        email.value = "";
+        password.value = "";
+        Object.keys(error).forEach((key) => ((error as any)[key] = ""));
+        if (router) router.replace("/dashboard");
+        return postResponse;
+      }
+    } catch (err: any) {
+      console.error("Error logging in:", err);
+      toast.error("Login failed" + " " + (err.message || ""));
+      return false;
+    } finally {
+      isLoading.value = false;
+    }
+  };
 
-      if (!this.email.trim()) {
-        this.error.email = "Email is required";
-      } else if (!emailReg.test(this.email.trim())) {
-        this.error.email = "Please enter a valid email address";
+  const handleLogin = async (router: any) => {
+    const toast = useToast();
+    isLoading.value = true;
+    try {
+      validateEmail();
+      validatePassword();
+      if (!error.email && !error.password) {
+        const result = await loginUser(
+          { email: email.value, password: password.value },
+          router
+        );
+        return !!result;
       } else {
-        this.error.email = "";
-      }
-    },
-
-    validatePassword() {
-      const passwordReg: RegExp =
-        /^(?=.*[A-Z])(?=.*[a-z])(?=.*\d)(?=.*[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]).{8,20}$/;
-
-      if (!this.password.trim()) {
-        this.error.password = "Password is required";
-      } else if (!passwordReg.test(this.password.trim())) {
-        this.error.password =
-          "Password min 8 and max 20 character at least one uppercase,lowercase,digit,and special character";
-      } else {
-        this.error.password = "";
-      }
-    },
-
-    validateConfirmPassword() {
-      if (!this.confirmPassword.trim()) {
-        this.error.confirmPassword = "Please confirm your password";
-      } else if (!this.isPasswordMatching) {
-        this.error.confirmPassword = "The passwords do not match";
-      } else {
-        this.error.confirmPassword = "";
-      }
-    },
-
-    async fetchCurrentUser() {
-      try {
-        const data = await authuser.me();
-        this.currentUser = data;
-        return data;
-      } catch {
-        this.currentUser = null;
-        return null;
-      }
-    },
-    async resendVerification() {
-      if (!this.canResend) return false;
-      this.resend.sending = true;
-      try {
-        await authuser.resendVerification();
-        this.resend.lastSentAt = Date.now();
-      } finally {
-        this.resend.sending = false;
-      }
-    },
-    // markVerified() {
-    //   if (this.currentUser)
-    //     this.currentUser.email_verified_at = new Date().toISOString();
-    // },
-
-    setTimezone(tz: string) {
-      this.timezone = tz;
-    },
-
-    formatTs(iso?: string | null, opts?: Intl.DateTimeFormatOptions) {
-      return formatTimestamp(iso, this.activeTimezone, opts);
-    },
-
-    async createUser(userData: UserSignup, router: any) {
-      const toast = useToast();
-      this.isLoading = true;
-      try {
-        const postResponse = await authuser.signup(userData);
-        if (postResponse) {
-          this.currentUser = postResponse;
-          toast.success("Account created successfully!");
-
-          //   reset the form
-          this.name = "";
-          this.password = "";
-          this.email = "";
-          this.confirmPassword = "";
-
-          // Reset all error messages
-          Object.keys(this.error).forEach((key) => {
-            (this.error as any)[key] = "";
-          });
-
-          if (router) {
-            router.replace("/dashboard");
-          }
-
-          return postResponse;
-        }
-      } catch (error: any) {
-        console.error("Error creating user:", error);
-        toast.error("Failed to create user. " + (error.message || ""));
-        return false;
-      } finally {
-        this.isLoading = false;
-      }
-    },
-
-    async handleSubmit(router: any) {
-      const toast = useToast();
-      this.isLoading = true;
-      try {
-        this.validateName();
-        this.validateEmail();
-        this.validatePassword();
-        this.validateConfirmPassword();
-
-        if (
-          !this.error.name &&
-          !this.error.email &&
-          !this.error.password &&
-          !this.error.confirmPassword
-        ) {
-          const result = await this.createUser(
-            {
-              name: this.name,
-              email: this.email,
-              password: this.password,
-              password_confirmation: this.confirmPassword,
-            },
-            router
-          );
-          return result ? true : false;
-        } else {
-          // If validation fails, show error
-          toast.error("Please fix the validation errors");
-          return false;
-        }
-      } catch (error: any) {
-        console.error("Handle submit error:", error);
-        toast.error("Something went wrong" + (error.message || ""));
-        return false;
-      } finally {
-        this.isLoading = false;
-      }
-    },
-
-    async loginUser(userData: UserSignup, router: any) {
-      const toast = useToast();
-      this.isLoading = true;
-      try {
-        const postResponse = await authuser.login(userData);
-        if (postResponse) {
-          this.currentUser = postResponse;
-          toast.success("Login successful!");
-          //   reset the form
-          this.email = "";
-          this.password = "";
-
-          // Reset all error messages
-          Object.keys(this.error).forEach((key) => {
-            (this.error as any)[key] = "";
-          });
-
-          if (router) {
-            router.replace("/dashboard");
-          }
-
-          return postResponse;
-        }
-      } catch (error: any) {
-        console.error("Error logging in:", error);
-        toast.error("Login failed" + " " + (error.message || ""));
-        return false;
-      } finally {
-        this.isLoading = false;
-      }
-    },
-
-    async handleLogin(router: any) {
-      const toast = useToast();
-      this.isLoading = true;
-      try {
-        // Validate all fields
-        this.validateEmail();
-        this.validatePassword();
-
-        if (!this.error.email && !this.error.password) {
-          const result = await this.loginUser(
-            {
-              email: this.email,
-              password: this.password,
-            },
-            router
-          );
-          return result ? true : false;
-        } else {
-          // If validation fails, show error
-          toast.error("Please fix the validation errors");
-          return false;
-        }
-      } catch (error: any) {
-        console.error("Handle login error:", error);
-        toast.error("Something went wrong" + (error.message || ""));
-        return false;
-      } finally {
-        this.isLoading = false;
-      }
-    },
-
-    async logout(router: any) {
-      const toast = useToast();
-
-      // Step 1: Ask for confirmation
-      const result = await Swal.fire({
-        title: "Are you sure?",
-        text: "You’ll be logged out of your account.",
-        icon: "warning",
-        showCancelButton: true,
-        confirmButtonColor: "#3085d6",
-        cancelButtonColor: "#d33",
-        confirmButtonText: "Yes, log me out",
-        cancelButtonText: "Cancel",
-      });
-
-      // Step 2: If user cancels, just exit
-      if (!result.isConfirmed) {
+        toast.error("Please fix the validation errors");
         return false;
       }
+    } catch (err: any) {
+      console.error("Handle login error:", err);
+      toast.error("Something went wrong" + (err.message || ""));
+      return false;
+    } finally {
+      isLoading.value = false;
+    }
+  };
 
-      this.isLoading = true;
-      try {
-        const response = await authuser.logout();
-        if (response) {
-          toast.success("You have been logged out successfully!");
+  const logout = async (router: any) => {
+    const toast = useToast();
 
-          // Clear client auth state
-          this.currentUser = null;
+    const result = await Swal.fire({
+      title: "Are you sure?",
+      text: "You’ll be logged out of your account.",
+      icon: "warning",
+      showCancelButton: true,
+      confirmButtonColor: "#3085d6",
+      cancelButtonColor: "#d33",
+      confirmButtonText: "Yes, log me out",
+      cancelButtonText: "Cancel",
+    });
 
-          if (router) router.replace("/login");
+    if (!result.isConfirmed) return false;
 
-          return response;
-        }
-      } catch (error: any) {
-        console.error("logout failed", error);
-        //  Use SweetAlert here – because it’s an unexpected failure / a critical error not a
-        // light one to use toast
-
-        await Swal.fire({
-          icon: "error",
-          title: "Logout failed",
-          text: "Please try again later.",
-          confirmButtonText: "OK",
-        });
-        return false;
-      } finally {
-        this.isLoading = false;
+    isLoading.value = true;
+    try {
+      const response = await authuser.logout();
+      if (response) {
+        toast.success("You have been logged out successfully!");
+        currentUser.value = null;
+        if (router) router.replace("/login");
+        return response;
       }
-    },
+    } catch (err: any) {
+      console.error("logout failed", err);
+      // logout does not need to be block even it there is an error it must still work
 
-    // link sent
-    async requestPasswordReset(email: string) {
-      const toast = useToast();
-      this.isLoading = true;
-      try {
-        await authuser.forgotPassword({ email });
-        toast.success("Password reset link sent to email.");
-        return true;
-      } catch (error: any) {
-        toast.error("Unable to send reset link. " + (error.message || ""));
-        return false;
-      } finally {
-        this.isLoading = false;
-      }
-    },
+      // await Swal.fire({
+      //   icon: "error",
+      //   title: "Logout failed",
+      //   text: "Please try again later.",
+      //   confirmButtonText: "OK",
+      // });
+      return false;
+    } finally {
+      currentUser.value = null;
+      toast.success("You have been logged out successfully!");
+      if (router) router.replace("/login");
+      isLoading.value = false;
+    }
+  };
 
-    async performPasswordReset(payload: {
-      token: string;
-      email: string;
-      password: string;
-      password_confirmation: string;
-    }) {
-      const toast = useToast();
-      this.isLoading = true;
-      try {
-        await authuser.resetPassword(payload);
-        toast.success("Password has been reset. You can log in now.");
-        return true;
-      } catch (error: any) {
-        toast.error("Reset failed. " + (error.message || ""));
-        return false;
-      } finally {
-        this.isLoading = false;
-      }
-    },
+  const requestPasswordReset = async (emailParam: string) => {
+    const toast = useToast();
+    isLoading.value = true;
+    try {
+      await authuser.forgotPassword({ email: emailParam });
+      toast.success("Password reset link sent to email.");
+      return true;
+    } catch (err: any) {
+      toast.error("Unable to send reset link. " + (err.message || ""));
+      return false;
+    } finally {
+      isLoading.value = false;
+    }
+  };
 
-    async changePassword(payload: {
-      current_password: string;
-      password: string;
-      password_confirmation: string;
-    }) {
-      const toast = useToast();
-      this.isLoading = true;
-      try {
-        await authuser.updatePassword(payload);
-        toast.success("Password updated successfully.");
-        return true;
-      } catch (error: any) {
-        toast.error(error?.message || "Unable to update password");
-        return false;
-      } finally {
-        this.isLoading = false;
-      }
-    },
+  const performPasswordReset = async (payload: {
+    token: string;
+    email: string;
+    password: string;
+    password_confirmation: string;
+  }) => {
+    const toast = useToast();
+    isLoading.value = true;
+    try {
+      await authuser.resetPassword(payload);
+      toast.success("Password has been reset. You can log in now.");
+      return true;
+    } catch (err: any) {
+      toast.error("Reset failed. " + (err.message || ""));
+      return false;
+    } finally {
+      isLoading.value = false;
+    }
+  };
 
-    async changeprofileinformation(payload: UserSignup) {
-      const toast = useToast();
-      this.isLoading = true;
-      try {
-        await authuser.updateProfileInfor(payload);
-        toast.success("Profile updated successfully.");
-        return true;
-      } catch (error: any) {
-        toast.error(error?.message || "Unable to update profile");
-        return false;
-      } finally {
-        this.isLoading = false;
-      }
-    },
-  },
+  const changePassword = async (payload: {
+    current_password: string;
+    password: string;
+    password_confirmation: string;
+  }) => {
+    const toast = useToast();
+    isLoading.value = true;
+    try {
+      await authuser.updatePassword(payload);
+      toast.success("Password updated successfully.");
+      return true;
+    } catch (err: any) {
+      toast.error(err?.message || "Unable to update password");
+      return false;
+    } finally {
+      isLoading.value = false;
+    }
+  };
+
+  const changeProfileInformation = async (payload: UserSignup) => {
+    const toast = useToast();
+    isLoading.value = true;
+    try {
+      await authuser.updateProfileInfor(payload);
+      toast.success("Profile updated successfully.");
+      return true;
+    } catch (err: any) {
+      toast.error(err?.message || "Unable to update profile");
+      return false;
+    } finally {
+      isLoading.value = false;
+    }
+  };
+
+  // ===== Return all state, getters, actions =====
+  return {
+    // state
+    name,
+    email,
+    password,
+    confirmPassword,
+    isLoading,
+    resend,
+    timezone,
+    currentUser,
+    error,
+
+    // getters
+    isPasswordMatching,
+    isAuthenticated,
+    isVerified,
+    needsVerification,
+    canResend,
+    activeTimezone,
+
+    // actions
+    validateName,
+    validateEmail,
+    validatePassword,
+    validateConfirmPassword,
+    fetchCurrentUser,
+    resendVerification,
+    setTimezone,
+    formatTs,
+    // createUser,
+    handleSubmit,
+    // loginUser,
+    handleLogin,
+    logout,
+    requestPasswordReset,
+    performPasswordReset,
+    changePassword,
+    changeProfileInformation,
+  };
 });

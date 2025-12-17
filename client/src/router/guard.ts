@@ -1,11 +1,11 @@
 import type { Router } from "vue-router";
-import { userAuthStore } from "@/stores/UserStore";
+import { useUserAuthStore } from "@/stores/UserStore";
 
 let authChecked = false;
 
 export function registerAuthGuards(router: Router) {
   router.beforeEach(async (to) => {
-    const store = userAuthStore();
+    const store = useUserAuthStore();
 
     if (!authChecked) {
       await store.fetchCurrentUser();
@@ -38,7 +38,7 @@ export function registerAuthGuards(router: Router) {
 
     // if the user is auth and trying to route to a guestonly show the dashboard
     //Guest-only pages: redirect authenticated users
-
+    // the meta is a custom object where i can store extra info
     if (to.meta.guestOnly && isAuthed) {
       return isVerified ? { name: "dashboard" } : { name: "verify-email" };
     }

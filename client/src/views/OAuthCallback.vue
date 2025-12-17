@@ -41,6 +41,13 @@ onMounted(async () => {
       return void (await router.replace({ name: "login" }));
     }
 
+    if (error === "server_error") {
+      toast.error(
+        "Something went wrong on our server. Please try again later."
+      );
+      return void (await router.replace({ name: "login" }));
+    }
+
     toast.error("Sign-in failed. Please try again.");
     return void (await router.replace({ name: "login" }));
   }

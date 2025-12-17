@@ -1,4 +1,6 @@
 import axios from "axios";
+import type UserSignup from "@/Typescript/UserSignup";
+import type Payment from "@/Typescript/Payment";
 
 const API_BASE_URL = "http://localhost:8000/api";
 const API_ROOT = "http://localhost:8000"; // root without /api
@@ -7,15 +9,16 @@ const API_ROOT = "http://localhost:8000"; // root without /api
 const api = axios.create({
   baseURL: API_BASE_URL,
   withCredentials: true, // allow cookies for Sanctum
-  headers: {
-    "Content-Type": "application/json",
-  },
 });
 
 const rootApi = axios.create({
   baseURL: API_ROOT,
   withCredentials: true,
 });
+
+// You only need await initializeCsrf() for browser-based,
+// cookie-authenticated requests that send data
+// (POST, PUT, PATCH, DELETE).
 
 export const initializeCsrf = async () => {
   try {
@@ -27,7 +30,7 @@ export const initializeCsrf = async () => {
 
 // Request interceptor to set CSRF token automatically
 // Reusable function to attach X-XSRF-TOKEN from cookie
-function attachXsrfHeader(config) {
+function attachXsrfHeader(config: any) {
   const match = document.cookie.match(/XSRF-TOKEN=([^;]+)/);
   if (match) config.headers["X-XSRF-TOKEN"] = decodeURIComponent(match[1]);
   return config;
@@ -60,35 +63,35 @@ rootApi.interceptors.response.use(
 
 // auth services
 export const authuser = {
-  async signup(userData) {
+  async signup(userData: UserSignup) {
     try {
       await initializeCsrf(); // Get CSRF token first
 
-      const { data, status } = await rootApi.post("/register", userData);
-      if (status === 200 || status === 201) {
-        return data.user;
-      } else {
-        // well this error here is thrown if after the backend response successful and the status is not what is expexted like its 500 instead of 200
-        throw new Error(data?.message || "Signup failed");
-      }
-    } catch (error) {
-      console.error("signup err", error);
+      const { data } = await rootApi.post("/register", userData);
+      return data.user;
+      // if (status === 200 || status === 201) {
+      //   return data.user;
+      // } else {
+      //   // well this error here is thrown if after the backend response successful and the status is not what is expexted like its 500 instead of 200
+      //   throw new Error(data?.message || "Signup failed");
+      // }
+    } catch (error: any) {
       throw new Error(error?.response?.data?.message || "Signup failed");
     }
   },
 
-  async login(userData) {
+  async login(userData: UserSignup) {
     try {
       await initializeCsrf(); // Get CSRF token first
 
-      const { data, status } = await rootApi.post("/login", userData);
-      if (status === 200) {
-        return data.user;
-      } else {
-        throw new Error(data?.message || "Signup failed");
-      }
-    } catch (error) {
-      console.error("login err", error);
+      const { data } = await rootApi.post("/login", userData);
+      return data.user;
+      // if (status === 200) {
+      //   return data.user;
+      // } else {
+      //   throw new Error(data?.message || "Signup failed");
+      // }
+    } catch (error: any) {
       throw new Error(
         error?.response?.data?.message || error?.message || "Login failed"
       );
@@ -97,12 +100,16 @@ export const authuser = {
 
   async logout() {
     try {
-      const { data, status } = await rootApi.post("/logout");
-      if (status === 200) {
-        return data?.message || "Logged out successfully";
-      }
-    } catch (error) {
-      console.error("logout err", error);
+      const { data } = await rootApi.post("/logout");
+      return data?.message || "Logged out successfully";
+      // if (status === 200) {
+      //   return data?.message || "Logged out successfully";
+      // }
+    } catch (error: any) {
+      // logout does not need to be block even it there is an error it must still work
+      throw new Error(
+        error?.response?.data?.message || error?.message || "Logout failed"
+      );
     }
   },
 
@@ -115,30 +122,60 @@ export const authuser = {
     return rootApi.post("/email/verification-notification");
   },
 
-  async forgotPassword(email) {
+  async forgotPassword(email: any) {
     await initializeCsrf(); // Get CSRF token first
     // with destructuring i will get access to the data straight like the status data header instead of it all and awaiting response.data
     const { data } = await rootApi.post("/forgot-password", email);
     return data;
   },
 
-  async resetPassword(payload) {
+  async resetPassword(payload: any) {
     // payload: { token, email, password, password_confirmation }
     await initializeCsrf(); // Get CSRF token first
     const { data } = await rootApi.post("/reset-password", payload);
     return data;
   },
-  async updatePassword(payload) {
+  async updatePassword(payload: any) {
     // payload = { current_password, password, password_confirmation }
     await initializeCsrf();
     const { data } = await rootApi.put("/user/password", payload);
     return data;
   },
 
-  async updateProfileInfor(payload) {
+  async updateProfileInfor(payload: any) {
     // payload ={email, name}
     await initializeCsrf();
     const { data } = await rootApi.put("user/profile-information", payload);
     return data;
+  },
+};
+
+// payment services
+export const paymentService = {
+  async initializePayment(payload: Payment) {
+    try {
+      // payload (reduced): { plan_id, customer_email, customer_name }
+      const { data } = await rootApi.post("/pay", payload);
+      return data;
+    } catch (error: any) {
+      console.error("Payment initialization error:", error);
+      throw new Error(
+        error?.response?.data?.message || "Payment initialization failed"
+      );
+    }
+  },
+
+  async verifyPayment(transactionId: string) {
+    try {
+      const { data } = await rootApi.get(
+        `/callback?transaction_id=${transactionId}`
+      );
+      return data;
+    } catch (error: any) {
+      console.error("Payment verification error:", error);
+      throw new Error(
+        error?.response?.data?.message || "Payment verification failed"
+      );
+    }
   },
 };

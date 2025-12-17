@@ -13,6 +13,8 @@ return [
         'reset-password',
         'user/password',
         'user/profile-information',
+        'pay',
+        'callback',
     ],
 
     'allowed_methods' => ['*'],

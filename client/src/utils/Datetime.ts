@@ -1,6 +1,14 @@
 export function browserTimeZone(): string {
-  // Intl.DateTimeFormat() create an object with tools for my date time format for my locale
-  // .resolvedOptions() with this it reveals the settings that are availabe like the timezone(Africa/Lagos) locale
+  //   new Intl.DateTimeFormat()
+  // Creates a formatter using the browser’s locale & settings
+  // resolvedOptions()
+  // Returns the actual settings the browser is using internally
+  //   {
+  //   locale: "en-NG",
+  //   timeZone: "Africa/Lagos",
+  //   calendar: "gregory",
+  //   numberingSystem: "latn"
+  // }
   // else it is just the string utc
   return new Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
 }
@@ -21,6 +29,7 @@ export function formatTimestamp(
   // this undefined means use the default browser set locale
   // instead of en-Us or fr-Fr this is specified
   // Intl.DateTimeFormat(locale, options)
+  //  Intl.DateTimeFormat () this line defines how you want your datetime to look like
   return new Intl.DateTimeFormat(undefined, {
     dateStyle: "medium",
     timeStyle: "short",

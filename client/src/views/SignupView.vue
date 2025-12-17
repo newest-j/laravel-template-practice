@@ -84,10 +84,10 @@
 
 <script setup lang="ts">
 // No logic yet — you’ll handle that yourself
-import { userAuthStore } from "../stores/UserStore";
+import { useUserAuthStore } from "../stores/UserStore";
 import { useRouter } from "vue-router";
 
-const userAuth = userAuthStore();
+const userAuth = useUserAuthStore();
 const router = useRouter();
 
 const onSubmit = async () => {
