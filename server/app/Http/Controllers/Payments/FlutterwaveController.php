@@ -139,6 +139,21 @@ class FlutterwaveController extends Controller
         return redirect(env('FRONTEND_ORIGIN') . '/payment/result?status=failed');
     }
 
+
+    public function getUserTransactionDetails(Request $request)
+    {
+        $transactionID = $request->query('transaction_id');
+        $transaction = Transaction::where('flutterwave_id', $transactionID)->where('user_id', $request->user()->id)->firstorfail();
+
+        return response()->json([
+            'amount' => $transaction->price,
+            'currency' => $transaction->currency,
+            'tx_ref' => $transaction->tx_ref,
+            'status' => $transaction->status,
+            'transaction_id' => $transaction->flutterwave_id
+        ]);
+    }
+
     // this is the webhook for flutterwave but it will only work in production when the site it host
     // and flutterwave can acces the url unlike in the localhost except you expose the localhot to
     // be public by using ngrok 5173 or 8000 for backend or frontend
@@ -147,6 +162,7 @@ class FlutterwaveController extends Controller
     //    public function webhook(Request $request)
     // {
     //     // 1️⃣ Verify Flutterwave signature
+    // the verif-hash is sent by fluterwave 
     //     $signature = $request->header('verif-hash');
     //     $expected = env('FLW_HASH');
 

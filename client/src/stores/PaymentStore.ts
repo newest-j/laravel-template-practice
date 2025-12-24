@@ -42,7 +42,6 @@ export const usePaymentStore = defineStore("payment", () => {
       };
 
       const response = await paymentService.initializePayment(payload);
-      paymentData.value = response;
 
       // Support different response shapes from backend
       const link =
@@ -73,11 +72,32 @@ export const usePaymentStore = defineStore("payment", () => {
 
     try {
       const response = await paymentService.verifyPayment(transactionId);
-      transactionStatus.value = response?.status || "unknown";
-      paymentData.value = response;
+      // const status = response?.status;
+      // transactionStatus.value =
+      //   status === "successful" ? "success" : status || null;
+      paymentData.value = response || null;
       return response;
     } catch (err: any) {
       error.value = err.message || "Payment verification failed";
+      transactionStatus.value = "failed";
+      return null;
+    } finally {
+      isLoading.value = false;
+    }
+  };
+
+  const getTrasactionDetails = async (transactionId: string) => {
+    isLoading.value = true;
+    clearError();
+    try {
+      const response = await paymentService.transactionDetails(transactionId);
+      // const status = response?.status;
+      // transactionStatus.value =
+      //   status === "successful" ? "success" : status || null;
+      paymentData.value = response;
+      return response;
+    } catch (err: any) {
+      error.value = err.message || "Payment details not found";
       transactionStatus.value = "failed";
       return null;
     } finally {
@@ -105,5 +125,6 @@ export const usePaymentStore = defineStore("payment", () => {
     resetPayment,
     initializePayment,
     verifyPayment,
+    getTrasactionDetails,
   };
 });

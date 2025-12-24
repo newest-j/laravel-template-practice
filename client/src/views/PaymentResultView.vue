@@ -31,7 +31,7 @@
           purchase!
         </p>
 
-        <div class="payment-details" v-if="paymentStore.paymentData">
+        <div class="payment-details" v-if="hasReceiptData">
           <h3>Transaction Details</h3>
           <div class="detail-row">
             <span>Amount:</span>
@@ -65,7 +65,7 @@
           <button
             @click="downloadReceipt"
             class="secondary-btn"
-            v-if="paymentStore.paymentData"
+            v-if="hasReceiptData"
           >
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
               <path
@@ -191,7 +191,7 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted } from "vue";
+import { onMounted, computed } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { usePaymentStore } from "@/stores/PaymentStore";
 
@@ -200,8 +200,8 @@ const router = useRouter();
 const paymentStore = usePaymentStore();
 
 onMounted(async () => {
-  const transactionId = route.query.transaction_id as string;
   const status = (route.query.status as string) || undefined;
+  const transactionId = route.query.transaction_id as string | undefined;
 
   // Set initial UI state from status query if present
   if (status === "success") {
@@ -210,13 +210,16 @@ onMounted(async () => {
     paymentStore.transactionStatus = "failed";
   }
 
-  // Do not auto-verify via API since backend callback now only redirects
-  // If no status is present, we have insufficient details
-  if (!status) {
-    // No transaction info provided
-    paymentStore.transactionStatus = "failed";
-    paymentStore.error = "No transaction details provided";
+  // If transaction id exists, fetch full transaction details
+  if (transactionId) {
+    await paymentStore.getTrasactionDetails(transactionId);
   }
+});
+
+// Single source of truth for when receipt/details can show
+const hasReceiptData = computed(() => {
+  const d = paymentStore.paymentData as any;
+  return !!d && (d.tx_ref || d.transaction_id || d.amount !== undefined);
 });
 
 // Intl.NumberFormat It defines how numbers should be formatted for display based on locale + options.
@@ -247,8 +250,12 @@ const formatDate = (date: Date) => {
 
 const downloadReceipt = () => {
   // Generate and download a receipt
+  const d: any = paymentStore.paymentData || {};
   const receiptData = {
-    ...paymentStore.paymentData,
+    amount: Number(d.amount) || 0,
+    currency: d.currency || "NGN",
+    tx_ref: d.tx_ref || d.reference || d.ref || "N/A",
+    transaction_id: d.transaction_id || d.transactionId || "N/A",
     date: new Date().toISOString(),
   };
 

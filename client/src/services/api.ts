@@ -178,4 +178,18 @@ export const paymentService = {
       );
     }
   },
+
+  async transactionDetails(transactionId: string) {
+    try {
+      const { data } = await rootApi.get(
+        `/transaction?transaction_id=${transactionId}`
+      );
+      return data;
+    } catch (error: any) {
+      console.error("Fetching details failed:", error);
+      throw new Error(
+        error?.response?.data?.message || "No Payment details data"
+      );
+    }
+  },
 };

@@ -15,5 +15,6 @@ Route::get('/auth/callback', [SocialAuthController::class, 'handleGoogleCallback
 // instead of calling the url you call the route name
 Route::post('/pay', [FlutterwaveController::class, 'initialize'])->name('flutterwave.pay');
 Route::get('/callback', [FlutterwaveController::class, 'callback'])->name('flutterwave.callback');
+Route::get('/transaction', [FlutterwaveController::class, 'getUserTransactionDetails']);
 // webhook (Flutterwave event notifications)
 // Route::post('/webhook/flutterwave', [FlutterwaveController::class, 'webhook'])->name('flutterwave.webhook');

@@ -54,7 +54,10 @@
         </h2>
 
         <div class="payment-section">
-          <div v-if="paymentStore.isLoading" class="overlay">
+          <div
+            v-if="initOverlayActive || paymentStore.isLoading"
+            class="overlay"
+          >
             <div class="spinner-large"></div>
             <p class="overlay-text">Initializing payment...</p>
           </div>
@@ -191,13 +194,14 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from "vue";
+import { ref, onBeforeUnmount } from "vue";
 import { useUserAuthStore } from "../stores/UserStore";
 import { usePaymentStore } from "@/stores/PaymentStore";
 import { useRouter } from "vue-router";
 
 const userAuth = useUserAuthStore();
 const paymentStore = usePaymentStore();
+const initOverlayActive = ref(false);
 // the userouter is for the router instance itself like to modify or navigate route e.g push or replace
 // whle the useroute is use for infor about the current route e.g params path query
 const router = useRouter();
@@ -262,6 +266,8 @@ const submitprofileupdate = async () => {
 
 // Payment functions
 const makeQuickPayment = async (amount: number) => {
+  // Keep spinner visible until this view unmounts
+  initOverlayActive.value = true;
   // Map quick amounts to backend plan IDs (example mapping)
   // Ensure these IDs exist in the plans table
   // the record is used for the type declaration for an Object
@@ -297,6 +303,10 @@ const makeQuickPayment = async (amount: number) => {
     console.error("Quick payment initialization failed");
   }
 };
+
+onBeforeUnmount(() => {
+  initOverlayActive.value = false;
+});
 
 // Custom payment page removed; dashboard offers quick plan options only.
 </script>

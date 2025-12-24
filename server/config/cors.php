@@ -15,6 +15,7 @@ return [
         'user/profile-information',
         'pay',
         'callback',
+        'transaction',
     ],
 
     'allowed_methods' => ['*'],
