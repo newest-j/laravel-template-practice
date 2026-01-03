@@ -1,11 +1,13 @@
 import type { Router } from "vue-router";
 import { useUserAuthStore } from "@/stores/UserStore";
+import { usePaymentStore } from "@/stores/PaymentStore";
 
 let authChecked = false;
 
 export function registerAuthGuards(router: Router) {
   router.beforeEach(async (to) => {
     const store = useUserAuthStore();
+    const paymentStore = usePaymentStore();
 
     if (!authChecked) {
       await store.fetchCurrentUser();
@@ -13,7 +15,8 @@ export function registerAuthGuards(router: Router) {
     }
 
     const isAuthed = store.isAuthenticated;
-    const isVerified = !!store.currentUser?.email_verified_at;
+    const isVerified = store.isVerified;
+    const isSubscribed = paymentStore.hasSubscription;
 
     // if the user is not auth and trying to acccess a requireauth show the login
     if (to.meta.requiresAuth && !isAuthed) {
@@ -41,6 +44,14 @@ export function registerAuthGuards(router: Router) {
     // the meta is a custom object where i can store extra info
     if (to.meta.guestOnly && isAuthed) {
       return isVerified ? { name: "dashboard" } : { name: "verify-email" };
+    }
+
+    if (to.meta.requiresSubscription && isAuthed && !isSubscribed) {
+      return { name: "dashboard" };
+    }
+
+    if (to.name === "dashboard" && isSubscribed) {
+      return { name: "user" };
     }
   });
 }

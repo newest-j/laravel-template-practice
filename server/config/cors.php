@@ -16,6 +16,7 @@ return [
         'pay',
         'callback',
         'transaction',
+        'subscription',
     ],
 
     'allowed_methods' => ['*'],

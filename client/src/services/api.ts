@@ -192,4 +192,18 @@ export const paymentService = {
       );
     }
   },
+
+  async checkSubscription(transactionId: string) {
+    try {
+      const { data } = await rootApi.get(
+        `/subscription?transaction_id=${transactionId}`
+      );
+      return data;
+    } catch (error: any) {
+      console.error("subscription check failed:", error);
+      throw new Error(
+        error?.response?.data?.message || "No subscription  data"
+      );
+    }
+  },
 };

@@ -3,15 +3,21 @@
 namespace App\Http\Controllers\Payments;
 
 use App\Http\Controllers\Controller;
+use App\Jobs\ActivatePlanJob;
+use App\Jobs\SendPaymentReceiptJob;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
 use App\Models\Plan;
+use App\Models\Subscription;
 use App\Models\Transaction;
+use Illuminate\Support\Facades\Bus;
 
 class FlutterwaveController extends Controller
 {
-    //
+    // so for the use of jobs it is what that is not need by the user immediately 
+    // like an instance response but run in the background
+    // job is the task made queue is to order to run the task
     public function initialize(Request $request)
     {
         // Validate required data
@@ -64,7 +70,7 @@ class FlutterwaveController extends Controller
 
         // Send to Flutterwave API
         // the withToken() = adds Authorization: Bearer TOKEN
-        $response = Http::withToken(env('FLW_SECRET_KEY'))
+        $response = Http::withToken(config('services.flutterwave.secret_key'))
             ->post('https://api.flutterwave.com/v3/payments', $payload);
 
         // Handle failure
@@ -79,6 +85,20 @@ class FlutterwaveController extends Controller
         return response()->json($response->json());
     }
 
+
+    // now there should be a settlement table to show how flutterwave send money 
+    // to my bank but this is only for production or live
+    //     or do something like this
+    //     if (app()->environment('production')) {
+    //     // run settlement sync
+    // }
+    // or in the webhook with   "event": "settlement.completed",
+    // or inside the  callback function with this 
+    // $response = Http::withToken(config('services.flutterwave.secret_key'))
+    //     ->get('https://api.flutterwave.com/v3/settlements');
+
+    // $settlements = $response->json()['data'];
+    // this is for one time payment transaction
 
     public function callback(Request $request)
     {
@@ -96,7 +116,7 @@ class FlutterwaveController extends Controller
         // Verify payment (Flutterwave payments are v3)
         $verifyUrl = "https://api.flutterwave.com/v3/transactions/{$transactionID}/verify";
 
-        $response = Http::withToken(env('FLW_SECRET_KEY'))->get($verifyUrl);
+        $response = Http::withToken(config('services.flutterwave.secret_key'))->get($verifyUrl);
 
         if (!$response->successful()) {
             return redirect(env('FRONTEND_ORIGIN') . '/payment/result?status=failed');
@@ -131,6 +151,17 @@ class FlutterwaveController extends Controller
                 'raw_response' => $data['data'],
             ]);
 
+            /* the bus facade is a helper for dispatching commands and jobs
+             with method like chaining
+             Laravel now knows: “these jobs must run in this order”.
+             The second job only runs if the first job succeeds.*/
+
+            Bus::chain([
+                ActivatePlanJob::dispatch($transactionID),
+                SendPaymentReceiptJob::dispatch($transactionID),
+
+            ])->dispatch();
+
             // Browser redirect to unified result page with transaction id and status
             return redirect(env('FRONTEND_ORIGIN') . "/payment/result?transaction_id={$transactionID}&status=success");
         }
@@ -143,7 +174,7 @@ class FlutterwaveController extends Controller
     public function getUserTransactionDetails(Request $request)
     {
         $transactionID = $request->query('transaction_id');
-        $transaction = Transaction::where('flutterwave_id', $transactionID)->where('user_id', $request->user()->id)->firstorfail();
+        $transaction = Transaction::where('flutterwave_id', $transactionID)->where('user_id', $request->user()->id)->firstOrFail();
 
         return response()->json([
             'amount' => $transaction->price,
@@ -151,6 +182,19 @@ class FlutterwaveController extends Controller
             'tx_ref' => $transaction->tx_ref,
             'status' => $transaction->status,
             'transaction_id' => $transaction->flutterwave_id
+        ]);
+    }
+
+    public function checkSubscriptionStatus(Request $request)
+    {
+        $transactionID = $request->query('transaction_id');
+        $subscription = Subscription::where('flutterwave_id', $transactionID)->where('user_id', $request->user()->id)->firstOrFail();
+
+        return response()->json([
+            'active' => $subscription->isActive(),
+            'status' => $subscription->status,
+            'started_at' => $subscription->started_at,
+            'expires_at' => $subscription->expires_at,
         ]);
     }
 
@@ -164,7 +208,7 @@ class FlutterwaveController extends Controller
     //     // 1️⃣ Verify Flutterwave signature
     // the verif-hash is sent by fluterwave 
     //     $signature = $request->header('verif-hash');
-    //     $expected = env('FLW_HASH');
+    //     $expected = config('services.flutterwave.secret_hash');
 
     //     if (!$expected || !$signature || !hash_equals($expected, $signature)) {
     //         return response()->json(['message' => 'Invalid signature'], 401);

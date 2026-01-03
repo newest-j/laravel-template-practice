@@ -8,6 +8,7 @@ export const usePaymentStore = defineStore("payment", () => {
   const isLoading = ref(false);
   const error = ref<string | null>(null);
   const paymentData = ref<any>(null);
+  const subscriptionData = ref<any>(null);
   const transactionStatus = ref<string | null>(null);
   const flowType = ref<"redirect" | null>(null);
   const planId = ref<number | null>(null);
@@ -17,6 +18,9 @@ export const usePaymentStore = defineStore("payment", () => {
   const customerName = ref<string>("");
 
   // Computed
+  const hasSubscription = computed<boolean>(
+    () => !!subscriptionData.value?.active
+  );
 
   // Actions
   const clearError = () => {
@@ -25,6 +29,7 @@ export const usePaymentStore = defineStore("payment", () => {
 
   const resetPayment = () => {
     paymentData.value = null;
+    subscriptionData.value = null;
     transactionStatus.value = null;
     error.value = null;
     flowType.value = null;
@@ -105,6 +110,20 @@ export const usePaymentStore = defineStore("payment", () => {
     }
   };
 
+  const checkSubscription = async (transactionId: string) => {
+    isLoading.value = true;
+    clearError();
+    try {
+      const response = await paymentService.checkSubscription(transactionId);
+      subscriptionData.value = response;
+    } catch (err: any) {
+      error.value = err.message || "Payment subscription not found";
+      return null;
+    } finally {
+      isLoading.value = false;
+    }
+  };
+
   return {
     // State
     isLoading,
@@ -113,18 +132,20 @@ export const usePaymentStore = defineStore("payment", () => {
     transactionStatus,
     flowType,
     planId,
+    subscriptionData,
 
     // Form data
     customerEmail,
     customerName,
 
     // Computed
-
+    hasSubscription,
     // Actions
     clearError,
     resetPayment,
     initializePayment,
     verifyPayment,
     getTrasactionDetails,
+    checkSubscription,
   };
 });

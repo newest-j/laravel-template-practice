@@ -43,4 +43,11 @@ return [
         'redirect' => env('GOOGLE_REDIRECT_URI', env('APP_URL') . '/auth/callback'),
     ],
 
+    'flutterwave' => [
+        'secret_key'  => env('FLW_SECRET_KEY'),
+        'public_key'  => env('FLW_PUBLIC_KEY'),
+        'secret_hash' => env('FLW_SECRET_HASH'),
+        'env'         => env('FLW_ENV', 'test'), // test or live
+    ],
+
 ];

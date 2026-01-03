@@ -25,12 +25,14 @@ class Plan extends Model
         'is_active' => 'boolean',
     ];
 
-    public function user(): HasMany
-    {
-        return $this->hasMany(User::class);
-    }
+
     public function transaction(): HasMany
     {
         return $this->hasMany(Transaction::class);
+    }
+
+    public function subscriptions(): HasMany
+    {
+        return $this->hasMany(Subscription::class);
     }
 }

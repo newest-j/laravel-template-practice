@@ -213,6 +213,7 @@ onMounted(async () => {
   // If transaction id exists, fetch full transaction details
   if (transactionId) {
     await paymentStore.getTrasactionDetails(transactionId);
+    await paymentStore.checkSubscription(transactionId);
   }
 });
 
@@ -220,6 +221,11 @@ onMounted(async () => {
 const hasReceiptData = computed(() => {
   const d = paymentStore.paymentData as any;
   return !!d && (d.tx_ref || d.transaction_id || d.amount !== undefined);
+});
+
+const hasSubscription = computed(() => {
+  const subscription = paymentStore.subscriptionData as any;
+  return !!subscription;
 });
 
 // Intl.NumberFormat It defines how numbers should be formatted for display based on locale + options.
@@ -295,14 +301,18 @@ Thank you for your payment!
   URL.revokeObjectURL(url);
 };
 
-const goToDashboard = () => {
+const goToDashboard = async () => {
+  if (hasSubscription) {
+    await router.replace("/user");
+  } else {
+    await router.push("/dashboard");
+  }
   paymentStore.resetPayment();
-  router.push("/dashboard");
 };
 
-const tryAgain = () => {
+const tryAgain = async () => {
+  await router.push("/dashboard");
   paymentStore.resetPayment();
-  router.push("/dashboard");
 };
 
 const checkAgain = async () => {
