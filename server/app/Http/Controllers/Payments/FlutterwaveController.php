@@ -82,7 +82,7 @@ class FlutterwaveController extends Controller
         }
 
         // Return payment link to frontend
-        return response()->json($response->json());
+        return response()->json($response->json(), 200);
     }
 
 
@@ -182,7 +182,7 @@ class FlutterwaveController extends Controller
             'tx_ref' => $transaction->tx_ref,
             'status' => $transaction->status,
             'transaction_id' => $transaction->flutterwave_id
-        ]);
+        ], 200);
     }
 
     public function checkSubscriptionStatus(Request $request)
@@ -195,7 +195,7 @@ class FlutterwaveController extends Controller
             'status' => $subscription->status,
             'started_at' => $subscription->started_at,
             'expires_at' => $subscription->expires_at,
-        ]);
+        ], 200);
     }
 
     // this is the webhook for flutterwave but it will only work in production when the site it host
