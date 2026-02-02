@@ -3,7 +3,6 @@
 namespace App\Jobs;
 
 use App\Mail\PayReceiptMail;
-use App\Models\Subscription;
 use App\Models\Transaction;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
@@ -34,10 +33,11 @@ class SendPaymentReceiptJob implements ShouldQueue
      */
     public function handle(): void
     {
-        //
-        $transaction = Transaction::with('user')->findOrFail($this->transactionId);
-        $subscription = Subscription::where('tx_ref', $transaction->tx_ref)->where('user_id', $transaction->user_id)->firstOrFail();
-
+        // Locate transaction by Flutterwave transaction id
+        $transaction = Transaction::with('user')
+            ->where('flutterwave_id', $this->transactionId)
+            ->firstOrFail();
+        $subscription = $transaction->subscription;
         Mail::to($transaction->user->email, $transaction->user->name)->send(new PayReceiptMail($transaction, $subscription));
     }
 }

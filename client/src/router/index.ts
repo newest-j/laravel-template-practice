@@ -61,7 +61,7 @@ const router = createRouter({
       path: "/user",
       name: "user",
       component: () => import("@/views/SubscribedUserView.vue"),
-      meta: { requireAuth: true, requiresSubscription: true },
+      meta: { requiresAuth: true, requiresSubscription: true },
     },
   ],
 });

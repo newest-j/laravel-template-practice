@@ -28,8 +28,12 @@ class ActivatePlanJob implements ShouldQueue
      */
     public function handle(): void
     {
-        //
-        $transaction = Transaction::with('user')->findOrFail($this->transactionId);
+        // Use Flutterwave transaction id to locate our local transaction
+        // so if it is not the primary key i should not use
+        // the find but the first with the where since they come together
+        $transaction = Transaction::with('user')
+            ->where('flutterwave_id', $this->transactionId)
+            ->firstOrFail();
         $transaction->user->createSubscription($transaction);
     }
 }

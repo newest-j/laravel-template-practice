@@ -38,7 +38,7 @@
             <strong>{{
               formatCurrency(
                 paymentStore.paymentData.amount,
-                paymentStore.paymentData.currency
+                paymentStore.paymentData.currency,
               )
             }}</strong>
           </div>
@@ -223,10 +223,10 @@ const hasReceiptData = computed(() => {
   return !!d && (d.tx_ref || d.transaction_id || d.amount !== undefined);
 });
 
-const hasSubscription = computed(() => {
-  const subscription = paymentStore.subscriptionData as any;
-  return !!subscription;
-});
+// const hasSubscription = computed(() => {
+//   const subscription = paymentStore.subscriptionData as any;
+//   return !!subscription;
+// });
 
 // Intl.NumberFormat It defines how numbers should be formatted for display based on locale + options.
 // it also have the resolveOptions {
@@ -302,7 +302,7 @@ Thank you for your payment!
 };
 
 const goToDashboard = async () => {
-  if (hasSubscription) {
+  if (paymentStore.hasSubscription) {
     await router.replace("/user");
   } else {
     await router.push("/dashboard");
@@ -340,7 +340,8 @@ const checkAgain = async () => {
   background: white;
   padding: 3rem;
   border-radius: 16px;
-  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1),
+  box-shadow:
+    0 20px 25px -5px rgba(0, 0, 0, 0.1),
     0 10px 10px -5px rgba(0, 0, 0, 0.04);
   width: 100%;
   max-width: 500px;

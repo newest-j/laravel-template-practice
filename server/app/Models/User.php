@@ -64,7 +64,7 @@ class User extends Authenticatable implements MustVerifyEmail
         return $this->hasMany(Transaction::class);
     }
 
-    public function subcription(): HasMany
+    public function subscriptions(): HasMany
     {
         return $this->hasMany(Subscription::class);
     }
@@ -72,16 +72,19 @@ class User extends Authenticatable implements MustVerifyEmail
 
     public function createSubscription(Transaction $transaction): Subscription
     {
-        return $this->subscriptions()->create([
+        $subscription = $this->subscriptions()->create([
             'plan_id' => $transaction->plan_id,
-            'tx_ref' => $transaction->tx_ref,
-            'flutterwave_id' => $transaction->flutterwave_id,
-            'price' => $transaction->price,
-            'currency' => $transaction->currency,
             'status' => 'active',
             'started_at' => now(),
             'expires_at' => now()->addMonth(),
-            'raw_response' => $transaction->raw_response,
         ]);
+
+        // Link transaction to subscription
+        // this means internally
+        // $transaction->subscription_id = $subscription->id;
+        $transaction->subscription()->associate($subscription);
+        $transaction->save();
+
+        return $subscription;
     }
 }

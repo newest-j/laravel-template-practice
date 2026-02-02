@@ -15,7 +15,7 @@
 
         <ul class="mt-4 space-y-2">
             <li><strong>Transaction Ref:</strong> {{ $transaction->tx_ref }}</li>
-            <li><strong>Amount:</strong> ${{ number_format($transaction->amount, 2) }}</li>
+            <li><strong>Amount:</strong> ${{ number_format($transaction->price, 2) }}</li>
             <li><strong>Date:</strong> {{ $transaction->created_at->format('d M Y H:i') }}</li>
         </ul>
 

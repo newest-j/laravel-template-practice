@@ -157,9 +157,8 @@ class FlutterwaveController extends Controller
              The second job only runs if the first job succeeds.*/
 
             Bus::chain([
-                ActivatePlanJob::dispatch($transactionID),
-                SendPaymentReceiptJob::dispatch($transactionID),
-
+                new ActivatePlanJob($transactionID),
+                new SendPaymentReceiptJob($transactionID),
             ])->dispatch();
 
             // Browser redirect to unified result page with transaction id and status
@@ -188,7 +187,20 @@ class FlutterwaveController extends Controller
     public function checkSubscriptionStatus(Request $request)
     {
         $transactionID = $request->query('transaction_id');
-        $subscription = Subscription::where('flutterwave_id', $transactionID)->where('user_id', $request->user()->id)->firstOrFail();
+
+        $transaction = Transaction::where('flutterwave_id', $transactionID)
+            ->where('user_id', $request->user()->id)
+            ->with('subscription')
+            ->firstOrFail();
+
+        if (!$transaction->subscription) {
+            return response()->json([
+                'active' => false,
+                'status' => 'no_subscription'
+            ], 404);
+        }
+
+        $subscription = $transaction->subscription;
 
         return response()->json([
             'active' => $subscription->isActive(),
