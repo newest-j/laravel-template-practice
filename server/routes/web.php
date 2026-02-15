@@ -19,3 +19,6 @@ Route::get('/transaction', [FlutterwaveController::class, 'getUserTransactionDet
 Route::get('/subscription', [FlutterwaveController::class, 'checkSubscriptionStatus']);
 // webhook (Flutterwave event notifications)
 // Route::post('/webhook/flutterwave', [FlutterwaveController::class, 'webhook'])->name('flutterwave.webhook');
+Route::get('/', function () {
+    return view('welcome');
+});

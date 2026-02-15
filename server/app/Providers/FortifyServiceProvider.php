@@ -25,8 +25,8 @@ use Laravel\Fortify\Contracts\LoginResponse as LoginResponseContract;
 use App\Http\Responses\LoginResponse;
 use Laravel\Fortify\Contracts\LogoutResponse as LogoutResponseContract;
 use App\Http\Responses\LogoutResponse;
-
-
+use App\Notifications\LoginSuccessful;
+use Illuminate\Validation\ValidationException;
 
 // the fortify route are register in the web route from fortify
 
@@ -90,9 +90,23 @@ class FortifyServiceProvider extends ServiceProvider
 
                 $user = User::where('email', $request->email)->first();
 
-                return $user && Hash::check($request->password, $user->password)
-                    ? $user
-                    : null; // Fortify handles guard->login() + session rotation
+                // Check credentials
+                if ($user && Hash::check($request->password, $user->password)) {
+                    //  Send login success notification
+                    $user->notify(new LoginSuccessful());
+
+                    // Return user to complete Fortify login
+                    return $user;
+                }
+
+                // 4. Invalid credentials
+                return null;
+
+                // return $user && Hash::check($request->password, $user->password)
+                //     ? $user
+                //     : null; // Fortify handles guard->login() + session rotation
+            } catch (ValidationException $e) {
+                throw $e;
             } catch (\Throwable $e) {
                 // 5. Handle unexpected errors
                 report($e);
